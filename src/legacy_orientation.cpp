@@ -25,18 +25,46 @@
  ******************************************************************************/
 
 /// @file
-/// %Orientation class and helper function(s) (implementation).
+/// Legacy 2D %Orientation class and helper function(s) (implementation).
 
 #include <ostream>
 
-#include "orientation.h"
+#include "legacy_orientation.h"
 #include "apf/math.h"
 #include "ssr_global.h"
+
+namespace
+{
+  // Convert 2D azimuth in radians to 3D rotation.
+  ssr::Rot azi2quat(float azimuth)
+  {
+    return {{0, 0, std::sin(azimuth / 2)}, std::cos(azimuth / 2)};
+  }
+
+  // Convert 3D rotation to 2D azimuth in radians.
+  // NB: This doesn't take care of Gimbal Lock!
+  float quat2azi(ssr::Rot rot)
+  {
+    auto [vector, w] = rot;
+    auto [x, y, z] = vector;
+    return std::atan2(2.0f * (w * z + x * y), 1.0f - 2.0f * (y * y + z * z));
+  }
+}
 
 /// ctor. @param azimuth azimuth (in degrees)
 Orientation::Orientation(const float azimuth) :
   azimuth(azimuth)
 {}
+
+/// Convert from 3D rotation.
+Orientation::Orientation(const ssr::Rot& three_d_rot) :
+  azimuth(apf::math::rad2deg(quat2azi(three_d_rot)) + 90.0f)
+{}
+
+Orientation::operator ssr::Rot()
+{
+  return azi2quat(apf::math::deg2rad(this->azimuth - 90.0f));
+}
 
 /** - operator.
  * @return difference of Orientations

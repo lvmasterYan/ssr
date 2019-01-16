@@ -25,19 +25,29 @@
  ******************************************************************************/
 
 /// @file
-/// %Position class and helper functions (implementation).
+/// Legacy 2D %Position class and helper functions (implementation).
 
 #include <cmath> // for atan2(), sqrt()
 #include <ostream>
 
-#include "position.h"
-#include "orientation.h"
+#include "legacy_position.h"
+#include "legacy_orientation.h"
 #include "apf/math.h"
 
 Position::Position(const float x, const float y) :
   x(x),
   y(y)
 {}
+
+Position::Position(const ssr::Pos& three_d_pos) :
+  x(three_d_pos.vector[0]),
+  y(three_d_pos.vector[1])
+{}
+
+Position::operator ssr::Pos()
+{
+  return {this->x, this->y, 0};
+}
 
 Position& Position::operator+=(const Position& other)
 {
