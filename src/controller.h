@@ -35,7 +35,7 @@
 #endif
 
 #include <functional>  // for std::function
-#include <type_traits>  // for std::is_same_v
+#include <type_traits>  // for std::is_same
 #include <unordered_set>
 
 #include "apf/jack_policy.h"
@@ -161,11 +161,11 @@ class Controller : public api::Publisher
     std::unique_ptr<api::Subscription>
     _subscribe_helper(Events* subscriber, F&& init_func = F{})
     {
-      std::lock_guard lock{_m};
+      std::lock_guard<std::mutex> lock{_m};
       std::forward<F>(init_func)();
       _subscribe<Events>(subscriber);
       return std::make_unique<Subscription>([this, subscriber]() {
-          std::lock_guard lock{_m};
+          std::lock_guard<std::mutex> lock{_m};
           _unsubscribe<Events>(subscriber);
       });
     }
@@ -349,7 +349,7 @@ class Controller : public api::Publisher
     {
       // NB: Nothing is sent to the "leader"
 
-      if constexpr (std::is_same_v<C, api::SceneControlEvents>)
+      if /* constexpr */ (std::is_same<C, api::SceneControlEvents>::value)
       {
         // In a "follower", those must use separate overload from above
         assert(!_conf.follow);
@@ -952,7 +952,7 @@ public:
     _controller._publish(_initiator,
         &api::SceneControlEvents::auto_rotate_sources, auto_rotate);
 
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       if (auto_rotate)
       {
@@ -976,7 +976,7 @@ public:
 
   void source_position(id_t id, const Pos& position) override
   {
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       auto* src = _controller._scene.get_source(id);
       if (src == nullptr)
@@ -992,7 +992,7 @@ public:
     }
     _controller._publish(_initiator,
         &api::SceneControlEvents::source_position, id, position);
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       if (_controller._scene.get_auto_rotation())
       {
@@ -1003,7 +1003,7 @@ public:
 
   void source_rotation(id_t id, const Rot& rotation) override
   {
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       if (_controller._scene.get_auto_rotation())
       {
@@ -1062,7 +1062,7 @@ public:
   {
     _controller._publish(_initiator,
         &api::SceneControlEvents::reference_position, position);
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       if (_controller._scene.get_auto_rotation())
       {
@@ -1103,7 +1103,7 @@ public:
   }
 
 protected:
-  static constexpr bool _is_leader = !std::is_same_v<X, ToLeaderTag>;
+  static constexpr bool _is_leader = !std::is_same<X, ToLeaderTag>::value;
   X* _initiator;
   Controller<Renderer>& _controller;
   std::lock_guard<std::mutex> _lock;
@@ -1120,7 +1120,7 @@ public:
 
   void load_scene(const std::string& filename) override
   {
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       if (!_controller._load_scene(filename))
       {
@@ -1135,7 +1135,7 @@ public:
 
   void save_scene(const std::string& filename) const override
   {
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       if (!_controller._save_scene(filename))
       {
@@ -1153,7 +1153,7 @@ public:
       , int channel, const Pos& position, const Rot& rotation, bool fixed
       , float volume, bool mute, const std::string& properties_file) override
   {
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       _controller._new_source(id, name, model, file_name_or_port_number
           , channel, position, rotation, fixed, volume, mute, properties_file);
@@ -1168,7 +1168,7 @@ public:
 
   void delete_all_sources() override
   {
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       _controller._delete_all_sources();
     }
@@ -1180,7 +1180,7 @@ public:
 
   void transport_start() override
   {
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       _controller._renderer.transport_start();
     }
@@ -1192,7 +1192,7 @@ public:
 
   void transport_stop() override
   {
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       _controller._renderer.transport_stop();
     }
@@ -1204,7 +1204,7 @@ public:
 
   void transport_locate(float time)
   {
-    if constexpr (_is_leader)
+    if /* constexpr */ (_is_leader)
     {
       _controller._transport_locate(time);
     }
@@ -1304,14 +1304,14 @@ Controller<Renderer>::subscribe_leader(api::Controller* leader)
     throw std::logic_error(
         "\"subscribe_leader()\" can only be called on \"follower\"");
   }
-  std::lock_guard lock{_m};
+  std::lock_guard<std::mutex> lock{_m};
   if (_leader != nullptr)
   {
     throw std::runtime_error("A \"leader\" is already subscribed");
   }
   _leader = leader;
   return std::make_unique<Subscription>([this]() {
-    std::lock_guard lock{_m};
+    std::lock_guard<std::mutex> lock{_m};
     _leader = nullptr;
   });
 }

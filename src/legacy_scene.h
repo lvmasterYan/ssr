@@ -169,7 +169,7 @@ class LegacyScene : public api::SceneControlEvents
     template<typename F>
     void for_each_source(F f) const
     {
-      for (const auto& [id, source]: _source_map) { f(id, source); }
+      for (const auto& item: _source_map) { f(item.first, item.second); }
     }
 
 
@@ -229,11 +229,11 @@ class LegacyScene : public api::SceneControlEvents
 
     std::string string_id(legacy_id_t id) const
     {
-      for (const auto& [str, num]: _source_id_map)
+      for (const auto& item: _source_id_map)
       {
-        if (num == id)
+        if (item.second == id)
         {
-          return str;
+          return item.first;
         }
       }
       throw std::runtime_error("Source doesn't exist");
@@ -254,7 +254,8 @@ class LegacyScene : public api::SceneControlEvents
 
     void delete_source(id_t id) override
     {
-      if (auto iter = _source_id_map.find(id); iter != _source_id_map.end())
+      auto iter = _source_id_map.find(id);
+      if (iter != _source_id_map.end())
       {
         // this should call the destructor for the LegacySource object.
         // IMPORTANT: the map holds the Sources directly, no pointers!
@@ -327,14 +328,14 @@ class LegacyScene : public api::SceneControlEvents
 
     void new_source(id_t id) override
     {
-      auto [iter, inserted] = _source_id_map.try_emplace(id, _next_source_id);
-      if (inserted)
+      auto item = _source_id_map.emplace(id, _next_source_id);
+      if (item.second)
       {
         ++_next_source_id;
 
-        VERBOSE("LegacyScene: Adding source \"" << iter->first
+        VERBOSE("LegacyScene: Adding source \"" << item.first->first
             << "\" to source map");
-        _source_map[iter->second] = LegacySource(_loudspeakers.size());
+        _source_map[item.first->second] = LegacySource(_loudspeakers.size());
       }
       else
       {
@@ -435,10 +436,11 @@ class LegacyScene : public api::SceneControlEvents
 
     void output_activity(id_t id, float* begin, float* end) override
     {
-      if (auto iter = _source_id_map.find(id); iter != _source_id_map.end())
+      auto iter = _source_id_map.find(id);
+      if (iter != _source_id_map.end())
       {
-        if (auto source_ptr = maptools::get_item(_source_map, iter->second)
-            ; source_ptr)
+        auto source_ptr = maptools::get_item(_source_map, iter->second);
+        if (source_ptr)
         {
           assert(source_ptr);
           if (source_ptr->output_levels.size()
@@ -487,10 +489,11 @@ class LegacyScene : public api::SceneControlEvents
     template<typename T, typename PointerToMember>
     void _set_source_member(id_t id, PointerToMember member, T&& arg)
     {
-      if (auto iter = _source_id_map.find(id); iter != _source_id_map.end())
+      auto iter = _source_id_map.find(id);
+      if (iter != _source_id_map.end())
       {
-        if (auto source_ptr = maptools::get_item(_source_map, iter->second)
-            ; source_ptr)
+        auto source_ptr = maptools::get_item(_source_map, iter->second);
+        if (source_ptr)
         {
           source_ptr->*member = std::forward<T>(arg);
           return;

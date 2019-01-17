@@ -66,7 +66,7 @@ public:
   template<typename F>
   void for_each_source(F f) const
   {
-    for (const auto& [id, source]: _source_map) { f(id, source); }
+    for (const auto& item: _source_map) { f(item.first, item.second); }
   }
 
   const Source* get_source(id_t id) const
@@ -239,8 +239,8 @@ private:
   void new_source(id_t id) override
   {
     VERBOSE("Adding source \"" << id << "\" to source map");
-    auto [iter, inserted] = _source_map.try_emplace(id);
-    if (inserted)
+    const auto& item = _source_map.emplace(id, Source{});
+    if (item.second)
     {
       _source_ids.push_back(id);
     }
