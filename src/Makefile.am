@@ -22,6 +22,10 @@ AM_CPPFLAGS =
 
 ## Add Audio Processing Framework (APF) path
 AM_CPPFLAGS += -I$(srcdir)/../apf
+if ENABLE_DYNAMIC_ASDF
+AM_CPPFLAGS += -I$(srcdir)/../asdfpp-jack-ecasound/src
+AM_CPPFLAGS += -I$(srcdir)/../asdfpp-jack-ecasound/asdfspline/include
+endif
 
 if ENABLE_APP_BUNDLE
 AM_CPPFLAGS += -DSSR_DATA_DIR=\"SoundScapeRenderer.app/Contents/Resources\"
@@ -174,6 +178,13 @@ SSRSOURCES += \
 	audioplayer.h \
 	audiorecorder.cpp \
 	audiorecorder.h
+endif
+
+if ENABLE_DYNAMIC_ASDF
+SSRSOURCES += \
+	../asdfpp-jack-ecasound/src/asdfpp.h \
+	../asdfpp-jack-ecasound/src/asdfpp_jack_ecasound.h \
+	../asdfpp-jack-ecasound/asdfspline/include/asdfspline.hpp
 endif
 
 if ENABLE_IP_INTERFACE

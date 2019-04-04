@@ -4,3 +4,6 @@
 [submodule "rapidjson"]
 	path = rapidjson
 	url = https://github.com/Tencent/rapidjson.git
+[submodule "asdfpp-jack-ecasound"]
+	path = asdfpp-jack-ecasound
+	url = https://github.com/AudioSceneDescriptionFormat/asdfpp-jack-ecasound.git

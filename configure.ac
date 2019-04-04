@@ -568,6 +568,18 @@ AS_IF([test x$have_ecasound != xno],
   AC_CHECK_PROG([have_ecasound_program], [ecasound], [yes], [no])
 ])
 
+ENABLE_FORCED([dynamic-asdf], [dynamic ASDF scenes],
+[
+  AS_IF([test x$have_ecasound != xyes],
+  [
+    AC_MSG_ERROR([Ecasound is required for dynamic ASDF scenes, use --disable-dynamic-asdf to disable])
+  ])
+  dnl JACK support was already checked above
+  dnl GML support was already checked above
+  PKG_CHECK_MODULES([PUGIXML], [pugixml], , [have_dynamic_asdf=no])
+  AC_CHECK_HEADER([fmt/format.h], , [have_dynamic_asdf=no])
+])
+
 dnl Checking for Polhemus Fastrak/Patriot support
 ENABLE_AUTO([polhemus], [Polhemus Fastrak/Patriot tracker support],
 [
@@ -773,7 +785,6 @@ gui_string=$have_gui
 AS_IF([test x$have_gui = xyes],
   [gui_string="yes"])
 
-echo "|"
 echo "| Build with tracker support:"
 echo "|    InterSense .......................... : $intersense_version"
 echo "|    Polhemus Fastrak/Patriot ............ : $have_polhemus"
@@ -781,6 +792,7 @@ echo "|    Razor AHRS .......................... : $have_razor"
 echo "|    VRPN ................................ : $have_vrpn"
 echo "|"
 echo "| Build with Ecasound support ............ : $have_ecasound"
+echo "| Dynamic ASDF scenes .................... : $have_dynamic_asdf"
 echo "| Network: legacy/WebSocket .............. : $have_ip_interface/$have_websocket_interface"
 echo "| Build with GUI ......................... : $gui_string"
 echo "|"
@@ -806,7 +818,6 @@ AS_IF([test x$have_help2man != xyes],
   echo "|>  Disabling building of manpages"
 ])
 
-echo "|"
 echo
 AS_IF([test x$have_app_bundle = xyes],
 [

@@ -42,6 +42,10 @@
 #include "maptools.h"
 #include "geometry.h"  // for vec3
 
+#ifdef ENABLE_DYNAMIC_ASDF
+#include "asdfpp_jack_ecasound.h"
+#endif
+
 #ifndef SSR_QUERY_POLICY
 #define SSR_QUERY_POLICY apf::disable_queries
 #endif
@@ -157,6 +161,13 @@ class RendererBase : public apf::MimoProcessor<Derived
         DataMember _member;
     };
 
+#ifdef ENABLE_DYNAMIC_ASDF
+    APF_PROCESS(RendererBase, _base)
+    {
+      //this->_process();
+    }
+#endif
+
     template<typename L, typename ListProxy, typename DataMember>
     void add_to_sublist(const L& input, ListProxy output, DataMember member)
     {
@@ -231,6 +242,10 @@ class RendererBase : public apf::MimoProcessor<Derived
     bool _show_head;
 
   private:
+#ifdef ENABLE_DYNAMIC_ASDF
+    void _process();
+#endif
+
     apf::parameter_map _add_params(const apf::parameter_map& params)
     {
       auto temp = params;
@@ -368,6 +383,16 @@ RendererBase<Derived>::get_source(id_t id)
     return iter->second;
   }
 }
+
+#ifdef ENABLE_DYNAMIC_ASDF
+template<typename Derived>
+void RendererBase<Derived>::_process()
+{
+  // TODO: get current transport position
+  // TODO: get "state" stuff
+  // TODO: iterate through source list and get relevant source data from ASDF
+}
+#endif
 
 /// A sound source.
 template<typename Derived>
