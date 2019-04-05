@@ -54,8 +54,8 @@ struct conf_struct
   //std::string playback_setup_file_name; ///< reproduction setup to load
   std::string xml_schema;               ///< schema file to validate XML files
   std::string audio_recorder_file_name; ///< output file for audio recorder
-  std::string input_port_prefix;        ///< e.g. "alsa_pcm:capture"
-  std::string output_port_prefix;       ///< e.g. "alsa_pcm:playback"
+  std::string input_port_prefix;        ///< e.g. "system:capture_"
+  std::string output_port_prefix;       ///< e.g. "system:playback_"
   std::string path_to_gui_images;       ///< dto.
   std::string websocket_resource_directory;  ///< resources for the HTML GUI
   std::string path_to_scene_menu;       ///< path to scene_menu.conf

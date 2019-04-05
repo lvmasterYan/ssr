@@ -578,6 +578,13 @@ ENABLE_FORCED([dynamic-asdf], [dynamic ASDF scenes],
   dnl GML support was already checked above
   PKG_CHECK_MODULES([PUGIXML], [pugixml], , [have_dynamic_asdf=no])
   AC_CHECK_HEADER([fmt/format.h], , [have_dynamic_asdf=no])
+
+  PKG_FLAGS="$PKG_FLAGS $PUGIXML_CFLAGS"
+  LIBS="$LIBS $PUGIXML_LIBS"
+  AS_IF([test x$GCC = xyes],
+  [
+    LIBS="$LIBS -lfmt -lstdc++fs"
+  ])
 ])
 
 dnl Checking for Polhemus Fastrak/Patriot support

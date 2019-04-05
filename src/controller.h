@@ -54,6 +54,10 @@
 #include "audiorecorder.h"
 #endif
 
+#ifdef ENABLE_DYNAMIC_ASDF
+#include "asdfpp_jack_ecasound.h"
+#endif
+
 #include "xmlparser.h"
 #include "configuration.h"
 
@@ -180,6 +184,10 @@ class Controller : public api::Publisher
 
     bool _load_scene(const std::string& filename);
     bool _save_scene(const std::string& filename) const;
+
+#ifdef ENABLE_DYNAMIC_ASDF
+    bool _load_dynamic_asdf(const std::string& scene_file_name);
+#endif
 
     void _new_source(const std::string& id, const std::string& name
       , const std::string& model, const std::string& file_name_or_port_number
@@ -346,6 +354,9 @@ class Controller : public api::Publisher
 #ifdef ENABLE_ECASOUND
     AudioRecorder::ptr_t    _audio_recorder; ///< pointer to audio recorder
     AudioPlayer::ptr_t      _audio_player;   ///< pointer to audio player
+#endif
+#ifdef ENABLE_DYNAMIC_ASDF
+    std::unique_ptr<asdf::JackEcasoundScene> _asdf_scene;
 #endif
 #ifdef ENABLE_IP_INTERFACE
     std::unique_ptr<legacy_network::Server> _network_interface;
@@ -1521,6 +1532,21 @@ Controller<Renderer>::_load_scene(const std::string& scene_file_name)
       return false;
     }
 
+    XMLParser::xpath_t xpath_result;
+    xpath_result = scene_file->eval_xpath("/asdf[@version=\"0.4\"]");
+    if (xpath_result)
+    {
+#ifdef ENABLE_DYNAMIC_ASDF
+      VERBOSE("Trying to load ASDF v0.4 file: " << scene_file_name);
+      return _load_dynamic_asdf(scene_file_name);
+    }
+    WARNING("ASDF version != 0.4, trying legacy ASDF ...");
+#else
+      WARNING("SSR was compiled without ASDF 0.4 support");
+      return false;
+    }
+#endif
+
     if (_conf.xml_schema == "")
     {
       ERROR("No schema file specified!");
@@ -1537,8 +1563,6 @@ Controller<Renderer>::_load_scene(const std::string& scene_file_name)
       << _conf.xml_schema << "'!");
       return false;
     }
-
-    XMLParser::xpath_t xpath_result;
 
     // GET MASTER VOLUME
     float master_volume = 0.0f; // dB
@@ -1701,9 +1725,34 @@ Controller<Renderer>::_load_scene(const std::string& scene_file_name)
       return false;
     }
   }
-  _transport_locate_frames(0);  // go to beginning of audio files
+  _transport_locate_frames(0);  // go to beginning of scene
   return true;
 }
+
+#ifdef ENABLE_DYNAMIC_ASDF
+template<typename Renderer>
+bool
+Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
+{
+  assert(!_conf.follow);
+  _delete_all_sources();
+
+  try
+  {
+    _asdf_scene = std::make_unique<asdf::JackEcasoundScene>(
+        scene_file_name, "ASDF-Player", _conf.input_port_prefix);
+  }
+  catch (std::exception& e)
+  {
+    ERROR(e.what() << "\n");
+    return false;
+  }
+
+  // TODO: ...
+
+  return true;
+}
+#endif
 
 template<typename Renderer>
 bool

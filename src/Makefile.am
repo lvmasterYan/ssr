@@ -183,7 +183,9 @@ endif
 if ENABLE_DYNAMIC_ASDF
 SSRSOURCES += \
 	../asdfpp-jack-ecasound/src/asdfpp.h \
+	../asdfpp-jack-ecasound/src/asdfpp.cpp \
 	../asdfpp-jack-ecasound/src/asdfpp_jack_ecasound.h \
+	../asdfpp-jack-ecasound/src/asdfpp_jack_ecasound.cpp \
 	../asdfpp-jack-ecasound/asdfspline/include/asdfspline.hpp
 endif
 
