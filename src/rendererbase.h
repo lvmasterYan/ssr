@@ -162,10 +162,7 @@ class RendererBase : public apf::MimoProcessor<Derived
     };
 
 #ifdef ENABLE_DYNAMIC_ASDF
-    APF_PROCESS(RendererBase, _base)
-    {
-      //this->_process();
-    }
+    struct Process;
 #endif
 
     template<typename L, typename ListProxy, typename DataMember>
@@ -242,10 +239,6 @@ class RendererBase : public apf::MimoProcessor<Derived
     bool _show_head;
 
   private:
-#ifdef ENABLE_DYNAMIC_ASDF
-    void _process();
-#endif
-
     apf::parameter_map _add_params(const apf::parameter_map& params)
     {
       auto temp = params;
@@ -385,13 +378,18 @@ RendererBase<Derived>::get_source(id_t id)
 }
 
 #ifdef ENABLE_DYNAMIC_ASDF
+// NB: The APF_PROCESS macro doesn't work here because of the use of CRTP.
 template<typename Derived>
-void RendererBase<Derived>::_process()
+struct RendererBase<Derived>::Process : _base::Process
 {
-  // TODO: get current transport position
-  // TODO: get "state" stuff
-  // TODO: iterate through source list and get relevant source data from ASDF
-}
+  Process(Derived& parent)
+    : _base::Process(parent)
+  {
+    // TODO: get current transport position
+    // TODO: get "state" stuff
+    // TODO: iterate through source list and get relevant source data from ASDF
+  }
+};
 #endif
 
 /// A sound source.
