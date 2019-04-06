@@ -1737,6 +1737,10 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   assert(!_conf.follow);
   _delete_all_sources();
 
+  // TODO: check if there is already a scene in the audio thread?
+
+  // TODO: wait for audio thread to make sure all sources are deleted?
+
   try
   {
     _asdf_scene = std::make_unique<asdf::JackEcasoundScene>(
@@ -1747,6 +1751,10 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
     ERROR(e.what() << "\n");
     return false;
   }
+
+  // TODO: add sources to _scene, mark them as special?
+
+  // TODO: move ownership of _asdf_scene to audio thread?
 
   // TODO: ...
 
