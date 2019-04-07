@@ -1737,9 +1737,10 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   assert(!_conf.follow);
   _delete_all_sources();
 
-  // TODO: check if there is already a scene in the audio thread?
+  // TODO: check if there is already a scene in the audio thread? remove it.
 
   // TODO: wait for audio thread to make sure all sources are deleted?
+  //_renderer.wait_for_rt_thread();  // TODO: not necessary!?
 
   try
   {
@@ -1752,9 +1753,27 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
     return false;
   }
 
+  //_publish(&api::SceneControlEvents::master_volume, ???);
+  //_publish(&api::SceneControlEvents::decay_exponent, ???);
+  //_publish(&api::SceneControlEvents::amplitude_reference_distance, ???);
+  //_publish(&api::SceneControlEvents::reference_position, ???);
+  //_publish(&api::SceneControlEvents::reference_rotation, ???);
+
   // TODO: add sources to _scene, mark them as special?
 
+  //for (...)
+  //{
+  //  _new_source(id, name, model, file_name_or_port_number
+  //      , channel, pos, rot, fixed, linear_volume, muted, properties_file);
+  //}
+
   // TODO: move ownership of _asdf_scene to audio thread?
+
+  // TODO: move sources to rt thread, then scene?
+
+  // TODO: move scene to rt thread, then sources?
+
+  // TODO: get necessary data from scene, move scene, then create sources?
 
   // TODO: ...
 

@@ -385,9 +385,12 @@ struct RendererBase<Derived>::Process : _base::Process
   Process(Derived& parent)
     : _base::Process(parent)
   {
+    // TODO: check if scene is loaded?
     // TODO: get current transport position
     // TODO: get "state" stuff
     // TODO: iterate through source list and get relevant source data from ASDF
+
+    // TODO: if interactive source exists, no need to check scene?
   }
 };
 #endif
