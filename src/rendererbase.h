@@ -227,6 +227,10 @@ class RendererBase : public apf::MimoProcessor<Derived
 
     const sample_type master_volume_correction;  // linear
 
+#ifdef ENABLE_DYNAMIC_ASDF
+    apf::SharedData<std::unique_ptr<asdf::JackEcasoundScene>> scene;
+#endif
+
   protected:
     RendererBase(const apf::parameter_map& p);
 
@@ -391,6 +395,11 @@ struct RendererBase<Derived>::Process : _base::Process
     // TODO: iterate through source list and get relevant source data from ASDF
 
     // TODO: if interactive source exists, no need to check scene?
+
+    // TODO: check for each piece of information if it changed.  If yes, send
+    // info back via query thread.
+
+    // TODO: activate/deactivate sources?
   }
 };
 #endif

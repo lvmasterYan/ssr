@@ -355,9 +355,6 @@ class Controller : public api::Publisher
     AudioRecorder::ptr_t    _audio_recorder; ///< pointer to audio recorder
     AudioPlayer::ptr_t      _audio_player;   ///< pointer to audio player
 #endif
-#ifdef ENABLE_DYNAMIC_ASDF
-    std::unique_ptr<asdf::JackEcasoundScene> _asdf_scene;
-#endif
 #ifdef ENABLE_IP_INTERFACE
     std::unique_ptr<legacy_network::Server> _network_interface;
 #endif
@@ -1735,16 +1732,11 @@ bool
 Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
 {
   assert(!_conf.follow);
-  _delete_all_sources();
 
-  // TODO: check if there is already a scene in the audio thread? remove it.
-
-  // TODO: wait for audio thread to make sure all sources are deleted?
-  //_renderer.wait_for_rt_thread();  // TODO: not necessary!?
-
+  std::unique_ptr<asdf::JackEcasoundScene> scene{};
   try
   {
-    _asdf_scene = std::make_unique<asdf::JackEcasoundScene>(
+    scene = std::make_unique<asdf::JackEcasoundScene>(
         scene_file_name, "ASDF-Player", _conf.input_port_prefix);
   }
   catch (std::exception& e)
@@ -1753,30 +1745,74 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
     return false;
   }
 
+  _delete_all_sources();
+  // Wait for sources to be deleted, to avoid source ID clashes:
+  _renderer.wait_for_rt_thread();
+
+  auto scene_ptr = scene.get();
+  // NB: Scene is asynchronously moved to the audio thread, but we can still
+  // access it here via the non-owning raw pointer.  The number of sources is
+  // fixed, so it is safe to iterate through them.
+  _renderer.scene = scene;
+  assert(scene == nullptr);
+  assert(scene_ptr != nullptr);
+
   //_publish(&api::SceneControlEvents::master_volume, ???);
   //_publish(&api::SceneControlEvents::decay_exponent, ???);
   //_publish(&api::SceneControlEvents::amplitude_reference_distance, ???);
   //_publish(&api::SceneControlEvents::reference_position, ???);
   //_publish(&api::SceneControlEvents::reference_rotation, ???);
 
+  // TODO: make sure to set all scene properties?
+
   // TODO: add sources to _scene, mark them as special?
 
-  //for (...)
-  //{
-  //  _new_source(id, name, model, file_name_or_port_number
-  //      , channel, pos, rot, fixed, linear_volume, muted, properties_file);
-  //}
+  auto total = scene_ptr->number_of_source();
+  for (size_t i = 0; i < total)
+  {
+    apf::parameter_map p;
+    // TODO: connect to multiple ports?
+    p.set("connect-to", ???);
+    //p.set("properties-file", ???);
+    try
+    {
+      id = _renderer.add_source(id, p);
+    }
+    catch (std::exception& e)
+    {
+      ERROR(e.what());
+      // TODO: remove all previously added sources?
+      return false;
+    }
+    assert(requested_id == id);
 
-  // TODO: move ownership of _asdf_scene to audio thread?
+    _publish(&api::SceneInformationEvents::new_source, id);
+    _publish(&api::SceneInformationEvents::source_property
+        , id, "port-name", port_name);
 
-  // TODO: move sources to rt thread, then scene?
+    //if (file_name_or_port_number != "")
+    //{
+    //  _publish(&api::SceneInformationEvents::source_property
+    //      , id, "audio-file", file_name_or_port_number);
+    //  _publish(&api::SceneInformationEvents::source_property
+    //      , id, "audio-file-channel", apf::str::A2S(channel));
+    //  _publish(&api::SceneInformationEvents::source_property
+    //      , id, "audio-file-length", apf::str::A2S(file_length));
+    //}
+    //_publish(&api::SceneInformationEvents::source_property
+    //    , id, "properties-file", properties_file);
 
-  // TODO: move scene to rt thread, then sources?
+    //_publish(&api::SceneControlEvents::source_name, id, name);
+    //_publish(&api::SceneControlEvents::source_model, id, model);
+    //_publish(&api::SceneControlEvents::source_position, id, position);
+    //_publish(&api::SceneControlEvents::source_rotation, id, rotation);
+    //_publish(&api::SceneControlEvents::source_fixed, id, fixed);
+    //_publish(&api::SceneControlEvents::source_volume, id, volume);
+    //_publish(&api::SceneControlEvents::source_mute, id, mute);
+  }
 
-  // TODO: get necessary data from scene, move scene, then create sources?
-
-  // TODO: ...
-
+  _renderer.wait_for_rt_thread();  // Wait for all sources to become available
+  _transport_locate_frames(0);
   return true;
 }
 #endif
