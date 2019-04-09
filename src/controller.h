@@ -1746,7 +1746,16 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   }
 
   _delete_all_sources();
-  // Wait for sources to be deleted, to avoid source ID clashes:
+
+  // TODO: set scene to nullptr?
+
+  // TODO: reset "state buffer"?
+
+  // TODO: reset "source buffer"?
+
+  // TODO: something to reset query thread information?
+
+  // Wait for sources to be deleted, to avoid source ID clashes with new ones:
   _renderer.wait_for_rt_thread();
 
   auto scene_ptr = scene.get();
@@ -1767,13 +1776,17 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
 
   // TODO: add sources to _scene, mark them as special?
 
-  auto total = scene_ptr->number_of_source();
-  for (size_t i = 0; i < total)
+  // TODO: reset vector of sources?
+
+  auto total = scene_ptr->number_of_sources();
+  for (size_t i = 0; i < total; i++)
   {
     apf::parameter_map p;
+    id_t id = scene_ptr->get_source_id(i);
     // TODO: connect to multiple ports?
-    p.set("connect-to", ???);
+    //p.set("connect-to", ???);
     //p.set("properties-file", ???);
+    p.set("dynamic_number", i);
     try
     {
       id = _renderer.add_source(id, p);
@@ -1784,11 +1797,11 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
       // TODO: remove all previously added sources?
       return false;
     }
-    assert(requested_id == id);
 
     _publish(&api::SceneInformationEvents::new_source, id);
-    _publish(&api::SceneInformationEvents::source_property
-        , id, "port-name", port_name);
+    // TODO: multiple port names?
+    //_publish(&api::SceneInformationEvents::source_property
+    //    , id, "port-name", port_name);
 
     //if (file_name_or_port_number != "")
     //{

@@ -389,12 +389,60 @@ struct RendererBase<Derived>::Process : _base::Process
   Process(Derived& parent)
     : _base::Process(parent)
   {
-    // TODO: check if scene is loaded?
-    // TODO: get current transport position
-    // TODO: get "state" stuff
-    // TODO: iterate through source list and get relevant source data from ASDF
+    const auto& scene = parent.scene.get();
+    if (!scene) return;
 
-    // TODO: if interactive source exists, no need to check scene?
+    // TODO: list of previous (dynamic) source properties
+    // TODO: previous (dynamic) "state"
+
+    auto transport_frame = parent.get_transport_state().second;
+
+    // TODO: get "state" stuff
+
+    for (auto& source: apf::cast_proxy<typename Derived::Source, rtlist_t>(
+          parent._source_list))
+    {
+      size_t source_number = source.dynamic_number;
+      if (source_number == static_cast<size_t>(-1))
+      {
+        continue;  // This source is not part of the dynamic ASDF scene
+      }
+      auto transform = scene->get_source_transform(
+          source_number, transport_frame);
+      if (transform)
+      {
+        // TODO: get data, check if it changed, update source object
+
+        std::optional<asdf::quat> old_rotation = std::nullopt;  // TODO: get real value
+
+        auto rotation = transform->rotation;
+        if (rotation != old_rotation)
+        {
+          if (rotation)
+          {
+            ssr::quat rot{*rotation};
+            Orientation ori{rot};
+            source.orientation.set_from_rt_thread(ori);
+          }
+
+          // TODO: update old_rotation
+
+          // TODO: prepare data for query thread
+        }
+        else
+        {
+          // TODO: nothing?
+        }
+
+        // TODO: handle other Transform members!
+      }
+      else
+      {
+        // TODO: source is inactive, what now?
+      }
+
+      // TODO: if it changed, prepare for sending via query thread
+    }
 
     // TODO: check for each piece of information if it changed.  If yes, send
     // info back via query thread.
@@ -441,6 +489,9 @@ class RendererBase<Derived>::Source
       , model(*p.fifo, "point")
       , weighting_factor()
       , id(p.id)
+#ifdef ENABLE_DYNAMIC_ASDF
+      , dynamic_number(p.get("dynamic_number", static_cast<size_t>(-1)))
+#endif
       , _input(*(p.input ? p.input : throw std::logic_error(
               "Bug (RendererBase::Source): input == NULL!")))
       , _pre_fader_level()
@@ -471,6 +522,9 @@ class RendererBase<Derived>::Source
     apf::BlockParameter<sample_type> weighting_factor;
 
     const std::string id;
+#ifdef ENABLE_DYNAMIC_ASDF
+    const size_t dynamic_number;
+#endif
 
   protected:
     const typename Derived::Input& _input;
