@@ -1746,12 +1746,13 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   }
 
   _delete_all_sources();
-
-  // TODO: set scene to nullptr?
+  _renderer.scene = nullptr;
 
   // TODO: reset "state buffer"?
 
-  // TODO: reset "source buffer"?
+  _renderer.dynamic_sources =
+    std::make_unique<typename Renderer::dynamic_source_list_t>(
+        scene->number_of_sources());
 
   // TODO: something to reset query thread information?
 
@@ -1773,10 +1774,6 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   //_publish(&api::SceneControlEvents::reference_rotation, ???);
 
   // TODO: make sure to set all scene properties?
-
-  // TODO: add sources to _scene, mark them as special?
-
-  // TODO: reset vector of sources?
 
   auto total = scene_ptr->number_of_sources();
   for (size_t i = 0; i < total; i++)

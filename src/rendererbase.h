@@ -162,6 +162,7 @@ class RendererBase : public apf::MimoProcessor<Derived
     };
 
 #ifdef ENABLE_DYNAMIC_ASDF
+    using dynamic_source_list_t = std::vector<std::optional<asdf::Transform>>;
     struct Process;
 #endif
 
@@ -229,6 +230,7 @@ class RendererBase : public apf::MimoProcessor<Derived
 
 #ifdef ENABLE_DYNAMIC_ASDF
     apf::SharedData<std::unique_ptr<asdf::JackEcasoundScene>> scene;
+    apf::SharedData<std::unique_ptr<dynamic_source_list_t>> dynamic_sources;
 #endif
 
   protected:
@@ -267,6 +269,7 @@ RendererBase<Derived>::RendererBase(const apf::parameter_map& p)
   , master_volume_correction(apf::math::dB2linear(
         this->params.get("master_volume_correction", 0.0)))
   , scene(_fifo)
+  , dynamic_sources(_fifo)
   , _master_level()
   , _source_list(_fifo)
   , _show_head(true)
@@ -393,7 +396,10 @@ struct RendererBase<Derived>::Process : _base::Process
     const auto& scene = parent.scene.get();
     if (!scene) return;
 
-    // TODO: list of previous (dynamic) source properties
+    assert(parent.dynamic_sources != nullptr);
+    auto& source_list = *parent.dynamic_sources.get();
+    assert(source_list.size() == scene->number_of_sources());
+
     // TODO: previous (dynamic) "state"
 
     auto transport_frame = parent.get_transport_state().second;
@@ -410,21 +416,41 @@ struct RendererBase<Derived>::Process : _base::Process
       }
       auto transform = scene->get_source_transform(
           source_number, transport_frame);
+      auto& old_transform = source_list[source_number];
       if (transform)
       {
         // TODO: get data, check if it changed, update source object
 
-        std::optional<asdf::quat> old_rotation = std::nullopt;  // TODO: get real value
+        if (old_transform == std::nullopt)
+        {
+          WARNING("TODO: Activate source " << source_number);
+          old_transform = asdf::Transform{};
+        }
 
         auto rotation = transform->rotation;
-        if (rotation != old_rotation)
+        if (rotation != old_transform->rotation)
         {
+          old_transform->rotation = rotation;
           if (rotation)
           {
             source.rotation.set_from_rt_thread(quat{*rotation});
           }
 
-          // TODO: update old_rotation
+          // TODO: prepare data for query thread
+        }
+        else
+        {
+          // TODO: nothing?
+        }
+
+        auto translation = transform->translation;
+        if (translation != old_transform->translation)
+        {
+          old_transform->translation = translation;
+          if (translation)
+          {
+            source.position.set_from_rt_thread(vec3{*translation});
+          }
 
           // TODO: prepare data for query thread
         }
@@ -437,7 +463,11 @@ struct RendererBase<Derived>::Process : _base::Process
       }
       else
       {
-        // TODO: source is inactive, what now?
+        if (old_transform != std::nullopt)
+        {
+          WARNING("TODO: Dectivate source " << source_number);
+          old_transform = std::nullopt;
+        }
       }
 
       // TODO: if it changed, prepare for sending via query thread
