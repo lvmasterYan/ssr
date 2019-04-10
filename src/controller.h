@@ -1762,7 +1762,7 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   // NB: Scene is asynchronously moved to the audio thread, but we can still
   // access it here via the non-owning raw pointer.  The number of sources is
   // fixed, so it is safe to iterate through them.
-  _renderer.scene = scene;
+  _renderer.scene = std::move(scene);
   assert(scene == nullptr);
   assert(scene_ptr != nullptr);
 
@@ -1782,7 +1782,7 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   for (size_t i = 0; i < total; i++)
   {
     apf::parameter_map p;
-    id_t id = scene_ptr->get_source_id(i);
+    std::string id = scene_ptr->get_source_id(i);
     // TODO: connect to multiple ports?
     //p.set("connect-to", ???);
     //p.set("properties-file", ???);

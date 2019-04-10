@@ -266,6 +266,7 @@ RendererBase<Derived>::RendererBase(const apf::parameter_map& p)
   , state(_fifo, p)
   , master_volume_correction(apf::math::dB2linear(
         this->params.get("master_volume_correction", 0.0)))
+  , scene(_fifo)
   , _master_level()
   , _source_list(_fifo)
   , _show_head(true)
@@ -420,9 +421,7 @@ struct RendererBase<Derived>::Process : _base::Process
         {
           if (rotation)
           {
-            ssr::quat rot{*rotation};
-            Orientation ori{rot};
-            source.orientation.set_from_rt_thread(ori);
+            source.rotation.set_from_rt_thread(quat{*rotation});
           }
 
           // TODO: update old_rotation
