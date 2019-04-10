@@ -603,6 +603,10 @@ class Controller<Renderer>::query_state
         _discard_source_levels = true;
         _new_size = source_list.size();
       }
+
+#ifdef ENABLE_DYNAMIC_ASDF
+      // TODO: query stuff?
+#endif
     }
 
     // NB: This is executed in the control thread
@@ -620,6 +624,10 @@ class Controller<Renderer>::query_state
           _controller._publish(&api::SceneInformationEvents::transport_rolling
               , rolling);
         }
+
+#ifdef ENABLE_DYNAMIC_ASDF
+        // TODO: publish stuff from dynamic scene
+#endif
       }
       _controller._publish(&api::CpuLoad::cpu_load, _cpu_load);
       _controller._publish(&api::MasterMetering::master_level, _master_level);
@@ -1755,6 +1763,8 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
         scene->number_of_sources());
 
   // TODO: something to reset query thread information?
+
+  // TODO: create *two* source lists for query thread
 
   // Wait for sources to be deleted, to avoid source ID clashes with new ones:
   _renderer.wait_for_rt_thread();
