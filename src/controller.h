@@ -611,6 +611,8 @@ class Controller<Renderer>::query_state
     // NB: This is executed in the control thread
     void update()
     {
+      // TODO: what if "load scene" has the lock?
+
       auto control = _controller.take_control();  // Scoped bundle
 
       if (!_controller._conf.follow)
@@ -654,6 +656,8 @@ class Controller<Renderer>::query_state
         _source_levels.resize(_new_size
           , SourceLevel(_renderer.get_output_list().size()));
       }
+
+      // TODO: check mutex? wait for resize instructions?
     }
 
   private:
@@ -1751,6 +1755,10 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
     return false;
   }
 
+  // TODO: check if transport is rolling
+
+  // TODO: stop transport
+
   _delete_all_sources();
   _renderer.scene = nullptr;
 
@@ -1831,6 +1839,9 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
 
   _renderer.wait_for_rt_thread();  // Wait for all sources to become available
   _transport_locate_frames(0);
+
+  // TODO: if transport was rolling before, start it again
+
   return true;
 }
 #endif
