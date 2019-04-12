@@ -228,6 +228,12 @@ class RendererBase : public apf::MimoProcessor<Derived
 
     const sample_type master_volume_correction;  // linear
 
+#ifdef ENABLE_DYNAMIC_ASDF
+    using dynamic_source_list_t = std::vector<std::optional<asdf::Transform>>;
+    // NB: It's probably not a good idea to make this public:
+    apf::SharedData<std::unique_ptr<dynamic_source_list_t>> dynamic_sources;
+#endif
+
   protected:
     RendererBase(const apf::parameter_map& p);
 
@@ -254,10 +260,7 @@ class RendererBase : public apf::MimoProcessor<Derived
     typename _base::Lock _lock;
 
 #ifdef ENABLE_DYNAMIC_ASDF
-    using dynamic_source_list_t = std::vector<std::optional<asdf::Transform>>;
-
     apf::SharedData<std::unique_ptr<asdf::JackEcasoundScene>> _scene;
-    apf::SharedData<std::unique_ptr<dynamic_source_list_t>> _dynamic_sources;
 #endif
 };
 
@@ -270,11 +273,11 @@ RendererBase<Derived>::RendererBase(const apf::parameter_map& p)
   , state(_fifo, p)
   , master_volume_correction(apf::math::dB2linear(
         this->params.get("master_volume_correction", 0.0)))
+  , dynamic_sources(_fifo)
   , _master_level()
   , _source_list(_fifo)
   , _show_head(true)
   , _scene(_fifo)
-  , _dynamic_sources(_fifo)
 {}
 
 /** Create a new source.
@@ -398,8 +401,8 @@ struct RendererBase<Derived>::Process : _base::Process
     const auto& scene = parent._scene.get();
     if (!scene) return;
 
-    assert(parent._dynamic_sources != nullptr);
-    auto& source_list = *parent._dynamic_sources.get();
+    assert(parent.dynamic_sources != nullptr);
+    auto& source_list = *parent.dynamic_sources.get();
     assert(source_list.size() == scene->number_of_sources());
 
     // TODO: previous (dynamic) "state"
@@ -423,7 +426,7 @@ struct RendererBase<Derived>::Process : _base::Process
       {
         if (target_transform == std::nullopt)
         {
-          // TODO: activate source?
+          // TODO: activate source in renderer?
           target_transform = asdf::Transform{};
         }
 
@@ -453,7 +456,7 @@ struct RendererBase<Derived>::Process : _base::Process
       {
         if (target_transform)
         {
-          // TODO: deactivate source?
+          // TODO: deactivate source in renderer?
         }
         target_transform = std::nullopt;
       }
@@ -477,7 +480,7 @@ RendererBase<Derived>::update_dynamic_scene(
   _scene = nullptr;
 
   // TODO: extend with "state" information?
-  _dynamic_sources = std::make_unique<dynamic_source_list_t>(
+  this->dynamic_sources = std::make_unique<dynamic_source_list_t>(
       scene->number_of_sources());
 
   // TODO: copy of _dynamic_source to compare against in query thread!

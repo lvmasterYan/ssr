@@ -604,44 +604,68 @@ class Controller<Renderer>::query_state
       }
 
 #ifdef ENABLE_DYNAMIC_ASDF
-      // TODO: query stuff?
-
-      // TODO: have the dynamic sources changed?
-      //       If yes, old stuff can be discarded (because a new scene was
-      //       loaded)
-      //       If the length is the same, could it still have changed?
+      if (_dynamic_sources)
+      {
+        const auto& ptr = _renderer.dynamic_sources.get();
+        assert(ptr);
+        const auto& renderer_sources = *ptr;
+        auto& query_sources = *_dynamic_sources;
+        assert(renderer_sources.size() == query_sources.size());
+        std::copy(renderer_sources.begin(), renderer_sources.end()
+            , query_sources.begin());
+      }
 #endif
     }
 
     // NB: This is executed in the control thread
     void update()
     {
-      // TODO: what if "load scene" has the lock?
-
       auto control = _controller.take_control();  // Scoped bundle
-
-      // TODO: only for leader!
-#ifdef ENABLE_DYNAMIC_ASDF
-#if 0
-      if (this->new_dynamic_sources)
-      {
-        // TODO:
-        _dynamic_sources = this->new_dynamic_sources;
-        assert(this->new_dynamic_sources == nullptr);
-
-        // TODO: a new scene was loaded, all information can be discarded!
-
-        // TODO: early return?
-      }
-      else
-      {
-        // TODO: check if there are differences, publish messages
-      }
-#endif
-#endif
 
       if (!_controller._conf.follow)
       {
+#ifdef ENABLE_DYNAMIC_ASDF
+        if (this->new_dynamic_sources)
+        {
+          // NB: A new scene was loaded, all old information can be discarded!
+
+          _dynamic_sources = std::move(this->new_dynamic_sources);
+          assert(this->new_dynamic_sources == nullptr);
+
+          // Make copy for later comparison
+          _old_dynamic_sources.assign(
+              _dynamic_sources->begin(), _dynamic_sources->end());
+        }
+        else if (_dynamic_sources)
+        {
+          assert(_dynamic_sources->size() == _old_dynamic_sources.size());
+          for (size_t i = 0; i < _dynamic_sources->size(); i++)
+          {
+            auto& old_source = _old_dynamic_sources[i];
+            const auto& new_source = (*_dynamic_sources)[i];
+            const auto& source_id = source_ids[i];
+            // TODO: check if there are differences, publish messages
+            if (old_source)
+            {
+              if (!new_source)
+              {
+                WARNING("TODO: deactivate source: " << source_id);
+                old_source = std::nullopt;
+                continue;
+              }
+
+              // TODO: go through properties
+            }
+            else
+            {
+              if (!new_source) { continue; }
+
+              WARNING("TODO: activate source: " << source_id);
+              old_source = new_source;
+            }
+          }
+        }
+#endif
         _controller._publish(&api::TransportFrameEvents::transport_frame
             , _state.second);
         bool rolling{_state.first};
@@ -650,10 +674,6 @@ class Controller<Renderer>::query_state
           _controller._publish(&api::SceneInformationEvents::transport_rolling
               , rolling);
         }
-
-#ifdef ENABLE_DYNAMIC_ASDF
-        // TODO: publish stuff from dynamic scene
-#endif
       }
       _controller._publish(&api::CpuLoad::cpu_load, _cpu_load);
       _controller._publish(&api::MasterMetering::master_level, _master_level);
@@ -662,8 +682,11 @@ class Controller<Renderer>::query_state
       {
         for (auto& item: _source_levels)
         {
-          _controller._publish(&api::SourceMetering::source_level
-              , item.source_id, item.source_level);
+          if (!_controller._conf.follow)
+          {
+            _controller._publish(&api::SourceMetering::source_level
+                , item.source_id, item.source_level);
+          }
 
           // TODO: make this a compile-time decision:
           if (item.outputs_available)
@@ -681,9 +704,15 @@ class Controller<Renderer>::query_state
         _source_levels.resize(_new_size
           , SourceLevel(_renderer.get_output_list().size()));
       }
-
-      // TODO: check mutex? wait for resize instructions?
     }
+
+#ifdef ENABLE_DYNAMIC_ASDF
+    using dynamic_source_list_t = std::vector<std::optional<asdf::Transform>>;
+
+    // NB: These public member must only be accessed with the main lock held
+    std::unique_ptr<dynamic_source_list_t> new_dynamic_sources;
+    std::vector<std::string> source_ids;
+#endif
 
   private:
     struct SourceLevel
@@ -712,6 +741,11 @@ class Controller<Renderer>::query_state
     source_levels_t _source_levels;
     bool _discard_source_levels = true;
     size_t _new_size = 0;
+
+#ifdef ENABLE_DYNAMIC_ASDF
+    std::unique_ptr<dynamic_source_list_t> _dynamic_sources;
+    dynamic_source_list_t _old_dynamic_sources;
+#endif
 };
 
 template<typename Renderer>
@@ -1801,10 +1835,18 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   // TODO: make sure to set all scene properties?
 
   auto total = scene_ptr->number_of_sources();
+
+  // NB: It is safe to write to _query_state here, because
+  //     query_state::update() also blocks on the controller lock.
+  _query_state.new_dynamic_sources =
+    std::make_unique<typename query_state::dynamic_source_list_t>(total);
+  _query_state.source_ids.clear();
+
   for (size_t i = 0; i < total; i++)
   {
     apf::parameter_map p;
     std::string id = scene_ptr->get_source_id(i);
+    _query_state.source_ids.push_back(id);
     // TODO: connect to multiple ports?
     //p.set("connect-to", ???);
     //p.set("properties-file", ???);
