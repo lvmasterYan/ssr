@@ -606,6 +606,8 @@ class Controller<Renderer>::query_state
 #ifdef ENABLE_DYNAMIC_ASDF
       if (_dynamic_sources)
       {
+        // NB: Accessing this is safe because this runs serially in the audio
+        //     thread:
         const auto& ptr = _renderer.dynamic_sources.get();
         assert(ptr);
         const auto& renderer_sources = *ptr;
@@ -620,7 +622,8 @@ class Controller<Renderer>::query_state
     // NB: This is executed in the control thread
     void update()
     {
-      auto control = _controller.take_control();  // Scoped bundle
+      // Start a scoped bundle, don't echo events to RenderSubscriber
+      auto control = _controller.take_control(&_controller._rendersubscriber);
 
       if (!_controller._conf.follow)
       {
@@ -644,7 +647,6 @@ class Controller<Renderer>::query_state
             auto& old_source = _old_dynamic_sources[i];
             const auto& new_source = (*_dynamic_sources)[i];
             const auto& source_id = source_ids[i];
-            // TODO: check if there are differences, publish messages
             if (old_source)
             {
               if (!new_source)
@@ -654,7 +656,20 @@ class Controller<Renderer>::query_state
                 continue;
               }
 
-              // TODO: go through properties
+              if (new_source->rotation
+                  && new_source->rotation != old_source->rotation)
+              {
+                control->source_rotation(source_id
+                    , quat{*new_source->rotation});
+              }
+              if (new_source->translation
+                  && new_source->translation != old_source->translation)
+              {
+                control->source_position(source_id
+                    , vec3{*new_source->translation});
+              }
+
+              // TODO: go through the rest of the properties
             }
             else
             {

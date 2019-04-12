@@ -273,11 +273,15 @@ RendererBase<Derived>::RendererBase(const apf::parameter_map& p)
   , state(_fifo, p)
   , master_volume_correction(apf::math::dB2linear(
         this->params.get("master_volume_correction", 0.0)))
+#ifdef ENABLE_DYNAMIC_ASDF
   , dynamic_sources(_fifo)
+#endif
   , _master_level()
   , _source_list(_fifo)
   , _show_head(true)
+#ifdef ENABLE_DYNAMIC_ASDF
   , _scene(_fifo)
+#endif
 {}
 
 /** Create a new source.
