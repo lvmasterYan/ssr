@@ -605,6 +605,11 @@ class Controller<Renderer>::query_state
 
 #ifdef ENABLE_DYNAMIC_ASDF
       // TODO: query stuff?
+
+      // TODO: have the dynamic sources changed?
+      //       If yes, old stuff can be discarded (because a new scene was
+      //       loaded)
+      //       If the length is the same, could it still have changed?
 #endif
     }
 
@@ -614,6 +619,26 @@ class Controller<Renderer>::query_state
       // TODO: what if "load scene" has the lock?
 
       auto control = _controller.take_control();  // Scoped bundle
+
+      // TODO: only for leader!
+#ifdef ENABLE_DYNAMIC_ASDF
+#if 0
+      if (this->new_dynamic_sources)
+      {
+        // TODO:
+        _dynamic_sources = this->new_dynamic_sources;
+        assert(this->new_dynamic_sources == nullptr);
+
+        // TODO: a new scene was loaded, all information can be discarded!
+
+        // TODO: early return?
+      }
+      else
+      {
+        // TODO: check if there are differences, publish messages
+      }
+#endif
+#endif
 
       if (!_controller._conf.follow)
       {
@@ -1743,7 +1768,7 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
 {
   assert(!_conf.follow);
 
-  std::unique_ptr<asdf::JackEcasoundScene> scene{};
+  auto scene = std::unique_ptr<asdf::JackEcasoundScene>{};
   try
   {
     scene = std::make_unique<asdf::JackEcasoundScene>(
@@ -1754,32 +1779,16 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
     ERROR(e.what() << "\n");
     return false;
   }
-
-  // TODO: check if transport is rolling
-
-  // TODO: stop transport
-
-  _delete_all_sources();
-  _renderer.scene = nullptr;
-
-  // TODO: reset "state buffer"?
-
-  _renderer.dynamic_sources =
-    std::make_unique<typename Renderer::dynamic_source_list_t>(
-        scene->number_of_sources());
-
-  // TODO: something to reset query thread information?
-
-  // TODO: create *two* source lists for query thread
-
-  // Wait for sources to be deleted, to avoid source ID clashes with new ones:
-  _renderer.wait_for_rt_thread();
-
   auto scene_ptr = scene.get();
+
+  bool rolling = _renderer.get_transport_state().first;
+  _renderer.transport_stop();
+  _delete_all_sources();
+
   // NB: Scene is asynchronously moved to the audio thread, but we can still
   // access it here via the non-owning raw pointer.  The number of sources is
   // fixed, so it is safe to iterate through them.
-  _renderer.scene = std::move(scene);
+  _renderer.update_dynamic_scene(std::move(scene));
   assert(scene == nullptr);
   assert(scene_ptr != nullptr);
 
@@ -1838,10 +1847,8 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   }
 
   _renderer.wait_for_rt_thread();  // Wait for all sources to become available
-  _transport_locate_frames(0);
-
-  // TODO: if transport was rolling before, start it again
-
+  _renderer.transport_locate(0);
+  if (rolling) { _renderer.transport_start(); }
   return true;
 }
 #endif

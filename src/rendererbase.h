@@ -111,7 +111,6 @@ class RendererBase : public apf::MimoProcessor<Derived
     using Input = typename _base::DefaultInput;
 #endif
 
-
     struct State
     {
       State(apf::CommandQueue& fifo, const apf::parameter_map& params)
@@ -162,8 +161,9 @@ class RendererBase : public apf::MimoProcessor<Derived
     };
 
 #ifdef ENABLE_DYNAMIC_ASDF
-    using dynamic_source_list_t = std::vector<std::optional<asdf::Transform>>;
     struct Process;
+
+    void update_dynamic_scene(std::unique_ptr<asdf::JackEcasoundScene> scene);
 #endif
 
     template<typename L, typename ListProxy, typename DataMember>
@@ -228,11 +228,6 @@ class RendererBase : public apf::MimoProcessor<Derived
 
     const sample_type master_volume_correction;  // linear
 
-#ifdef ENABLE_DYNAMIC_ASDF
-    apf::SharedData<std::unique_ptr<asdf::JackEcasoundScene>> scene;
-    apf::SharedData<std::unique_ptr<dynamic_source_list_t>> dynamic_sources;
-#endif
-
   protected:
     RendererBase(const apf::parameter_map& p);
 
@@ -257,6 +252,13 @@ class RendererBase : public apf::MimoProcessor<Derived
     size_t _next_id_suffix = 0;
 
     typename _base::Lock _lock;
+
+#ifdef ENABLE_DYNAMIC_ASDF
+    using dynamic_source_list_t = std::vector<std::optional<asdf::Transform>>;
+
+    apf::SharedData<std::unique_ptr<asdf::JackEcasoundScene>> _scene;
+    apf::SharedData<std::unique_ptr<dynamic_source_list_t>> _dynamic_sources;
+#endif
 };
 
 /** Constructor.
@@ -268,11 +270,11 @@ RendererBase<Derived>::RendererBase(const apf::parameter_map& p)
   , state(_fifo, p)
   , master_volume_correction(apf::math::dB2linear(
         this->params.get("master_volume_correction", 0.0)))
-  , scene(_fifo)
-  , dynamic_sources(_fifo)
   , _master_level()
   , _source_list(_fifo)
   , _show_head(true)
+  , _scene(_fifo)
+  , _dynamic_sources(_fifo)
 {}
 
 /** Create a new source.
@@ -393,11 +395,11 @@ struct RendererBase<Derived>::Process : _base::Process
   Process(Derived& parent)
     : _base::Process(parent)
   {
-    const auto& scene = parent.scene.get();
+    const auto& scene = parent._scene.get();
     if (!scene) return;
 
-    assert(parent.dynamic_sources != nullptr);
-    auto& source_list = *parent.dynamic_sources.get();
+    assert(parent._dynamic_sources != nullptr);
+    auto& source_list = *parent._dynamic_sources.get();
     assert(source_list.size() == scene->number_of_sources());
 
     // TODO: previous (dynamic) "state"
@@ -416,69 +418,80 @@ struct RendererBase<Derived>::Process : _base::Process
       }
       auto transform = scene->get_source_transform(
           source_number, transport_frame);
-      auto& old_transform = source_list[source_number];
+      auto& target_transform = source_list[source_number];
       if (transform)
       {
-        // TODO: get data, check if it changed, update source object
-
-        if (old_transform == std::nullopt)
+        if (target_transform == std::nullopt)
         {
-          WARNING("TODO: Activate source " << source_number);
-          old_transform = asdf::Transform{};
+          // TODO: activate source?
+          target_transform = asdf::Transform{};
         }
 
         auto rotation = transform->rotation;
-        if (rotation != old_transform->rotation)
+        if (rotation != target_transform->rotation)
         {
-          old_transform->rotation = rotation;
+          target_transform->rotation = rotation;
           if (rotation)
           {
             source.rotation.set_from_rt_thread(quat{*rotation});
           }
-
-          // TODO: prepare data for query thread
-        }
-        else
-        {
-          // TODO: nothing?
         }
 
         auto translation = transform->translation;
-        if (translation != old_transform->translation)
+        if (translation != target_transform->translation)
         {
-          old_transform->translation = translation;
+          target_transform->translation = translation;
           if (translation)
           {
             source.position.set_from_rt_thread(vec3{*translation});
           }
-
-          // TODO: prepare data for query thread
-        }
-        else
-        {
-          // TODO: nothing?
         }
 
         // TODO: handle other Transform members!
       }
       else
       {
-        if (old_transform != std::nullopt)
+        if (target_transform)
         {
-          WARNING("TODO: Dectivate source " << source_number);
-          old_transform = std::nullopt;
+          // TODO: deactivate source?
         }
+        target_transform = std::nullopt;
       }
-
-      // TODO: if it changed, prepare for sending via query thread
     }
-
-    // TODO: check for each piece of information if it changed.  If yes, send
-    // info back via query thread.
-
-    // TODO: activate/deactivate sources?
   }
 };
+
+
+/// Takes ownership of the scene.
+/// This has to be called while the controller lock is held.
+/// All sources have to be deleted before calling this and the new sources have
+/// to be added afterwards.
+template<typename Derived>
+void
+RendererBase<Derived>::update_dynamic_scene(
+    std::unique_ptr<asdf::JackEcasoundScene> scene)
+{
+  assert(scene);
+
+  // NB: This is important because the audio thread checks _scene first
+  _scene = nullptr;
+
+  // TODO: extend with "state" information?
+  _dynamic_sources = std::make_unique<dynamic_source_list_t>(
+      scene->number_of_sources());
+
+  // TODO: copy of _dynamic_source to compare against in query thread!
+
+  // TODO: reset "state buffer"?
+
+  // TODO: something to reset query thread information?
+
+  // Wait for sources to be deleted, to avoid source ID clashes with new ones.
+  // Also, make sure the audio thread runs at least once with an empty scene.
+  this->wait_for_rt_thread();
+
+  _scene = std::move(scene);
+}
 #endif
 
 /// A sound source.
