@@ -1585,9 +1585,7 @@ Controller<Renderer>::_load_scene(const std::string& scene_file_name)
 
   bool rolling = _renderer.get_transport_state().first;
   _renderer.transport_stop();
-  VERBOSE("before deleting");
   _delete_all_sources();
-  VERBOSE("after deleting");
 
 #ifdef ENABLE_ECASOUND
   _audio_player.reset();  // shut down audio player
@@ -1834,7 +1832,7 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   try
   {
     scene = std::make_unique<asdf::JackEcasoundScene>(
-        scene_file_name, "ASDF-Player", _conf.input_port_prefix);
+        scene_file_name, _conf.input_port_prefix);
   }
   catch (std::exception& e)
   {
@@ -1850,13 +1848,13 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
   assert(scene == nullptr);
   assert(scene_ptr != nullptr);
 
+  // TODO: get immutable scene properties
+
   //_publish(&api::SceneControlEvents::master_volume, ???);
   //_publish(&api::SceneControlEvents::decay_exponent, ???);
   //_publish(&api::SceneControlEvents::amplitude_reference_distance, ???);
-  //_publish(&api::SceneControlEvents::reference_position, ???);
-  //_publish(&api::SceneControlEvents::reference_rotation, ???);
 
-  // TODO: make sure to set all scene properties?
+  // TODO: scene_ptr->length();  // in samples
 
   auto total = scene_ptr->number_of_sources();
 
@@ -1871,8 +1869,6 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
     apf::parameter_map p;
     std::string id = scene_ptr->get_source_id(i);
     _query_state.source_ids.push_back(id);
-    // TODO: connect to multiple ports?
-    //p.set("connect-to", ???);
     //p.set("properties-file", ???);
     p.set("dynamic_number", i);
     try
@@ -1887,19 +1883,28 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
     }
 
     _publish(&api::SceneInformationEvents::new_source, id);
-    // TODO: multiple port names?
-    //_publish(&api::SceneInformationEvents::source_property
-    //    , id, "port-name", port_name);
 
-    //if (file_name_or_port_number != "")
-    //{
-    //  _publish(&api::SceneInformationEvents::source_property
-    //      , id, "audio-file", file_name_or_port_number);
-    //  _publish(&api::SceneInformationEvents::source_property
-    //      , id, "audio-file-channel", apf::str::A2S(channel));
-    //  _publish(&api::SceneInformationEvents::source_property
-    //      , id, "audio-file-length", apf::str::A2S(file_length));
-    //}
+    const std::string& source_port = _renderer.get_source(id)->port_name();
+    for (const std::string& clip_port: scene_ptr->get_jack_ports(i))
+    {
+      if (!_renderer.connect_ports(clip_port, source_port))
+      {
+        ERROR("Unable to connect JACK ports \"" << clip_port << "\" and \""
+           << source_port << "\"");
+      }
+    }
+
+    // TODO: multiple port names?
+    _publish(&api::SceneInformationEvents::source_property
+        , id, "port-name", "???");
+    _publish(&api::SceneInformationEvents::source_property
+        , id, "audio-file", "???");
+    _publish(&api::SceneInformationEvents::source_property
+        , id, "audio-file-channel", "???");
+    _publish(&api::SceneInformationEvents::source_property
+        , id, "audio-file-length", "???");
+
+    // TODO:
     //_publish(&api::SceneInformationEvents::source_property
     //    , id, "properties-file", properties_file);
 

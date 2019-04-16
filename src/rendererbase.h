@@ -552,6 +552,11 @@ class RendererBase<Derived>::Source
     // In the default case, the output levels are ignored
     bool get_output_levels(sample_type*, sample_type*) const { return false; }
 
+    std::string port_name() const
+    {
+      return _input.port_name();
+    }
+
     void connect() {}
     void disconnect() {}
 
