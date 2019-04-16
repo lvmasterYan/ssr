@@ -471,14 +471,13 @@ struct RendererBase<Derived>::Process : _base::Process
 
 /// Takes ownership of the scene.
 /// This has to be called while the controller lock is held.
-/// All sources have to be deleted before calling this and the new sources have
-/// to be added afterwards.
 template<typename Derived>
 void
 RendererBase<Derived>::update_dynamic_scene(
     std::unique_ptr<asdf::JackEcasoundScene> scene)
 {
   assert(scene);
+  assert(_source_map.empty());
 
   // NB: This is important because the audio thread checks _scene first
   _scene = nullptr;
@@ -487,11 +486,7 @@ RendererBase<Derived>::update_dynamic_scene(
   this->dynamic_sources = std::make_unique<dynamic_source_list_t>(
       scene->number_of_sources());
 
-  // TODO: copy of _dynamic_source to compare against in query thread!
-
   // TODO: reset "state buffer"?
-
-  // TODO: something to reset query thread information?
 
   // Wait for sources to be deleted, to avoid source ID clashes with new ones.
   // Also, make sure the audio thread runs at least once with an empty scene.

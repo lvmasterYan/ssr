@@ -1583,8 +1583,11 @@ Controller<Renderer>::_load_scene(const std::string& scene_file_name)
 {
   assert(!_conf.follow);
 
-  // remove all existing sources (if any)
+  bool rolling = _renderer.get_transport_state().first;
+  _renderer.transport_stop();
+  VERBOSE("before deleting");
   _delete_all_sources();
+  VERBOSE("after deleting");
 
 #ifdef ENABLE_ECASOUND
   _audio_player.reset();  // shut down audio player
@@ -1619,7 +1622,14 @@ Controller<Renderer>::_load_scene(const std::string& scene_file_name)
     {
 #ifdef ENABLE_DYNAMIC_ASDF
       VERBOSE("Trying to load ASDF v0.4 file: " << scene_file_name);
-      return _load_dynamic_asdf(scene_file_name);
+      bool result = _load_dynamic_asdf(scene_file_name);
+      if (result)
+      {
+        _renderer.wait_for_rt_thread();
+        _renderer.transport_locate(0);
+        if (rolling) { _renderer.transport_start(); }
+      }
+      return result;
     }
     WARNING("ASDF version != 0.4, trying legacy ASDF ...");
 #else
@@ -1806,7 +1816,10 @@ Controller<Renderer>::_load_scene(const std::string& scene_file_name)
       return false;
     }
   }
-  _transport_locate_frames(0);  // go to beginning of scene
+
+  _renderer.wait_for_rt_thread();  // Wait for all sources to become available
+  _renderer.transport_locate(0);
+  if (rolling) { _renderer.transport_start(); }
   return true;
 }
 
@@ -1829,10 +1842,6 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
     return false;
   }
   auto scene_ptr = scene.get();
-
-  bool rolling = _renderer.get_transport_state().first;
-  _renderer.transport_stop();
-  _delete_all_sources();
 
   // NB: Scene is asynchronously moved to the audio thread, but we can still
   // access it here via the non-owning raw pointer.  The number of sources is
@@ -1902,10 +1911,6 @@ Controller<Renderer>::_load_dynamic_asdf(const std::string& scene_file_name)
     //_publish(&api::SceneControlEvents::source_volume, id, volume);
     //_publish(&api::SceneControlEvents::source_mute, id, mute);
   }
-
-  _renderer.wait_for_rt_thread();  // Wait for all sources to become available
-  _renderer.transport_locate(0);
-  if (rolling) { _renderer.transport_start(); }
   return true;
 }
 #endif
